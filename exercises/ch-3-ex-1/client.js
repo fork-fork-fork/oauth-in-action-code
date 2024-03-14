@@ -49,12 +49,13 @@ app.get('/authorize', function(req, res){
 	access_token = null;
 
 	state = randomstring.generate(); // 랜덤 값 할당
+	// rerirect_url 이 호출됐을 때, state 값을 확인할 수 있도록 애플리케이션에 저장되어 있어야 함
 
 	var options = {
 		response_type: 'code',
 		client_id: client.client_id,
 		redirect_uri: client.redirect_uris[0],
-		state: state
+		state: state // 인가 엔드포인트로 전달되는 파라미터에 state 파라미터 추가해야 함
 	}
 	console.log('options: ', options)
 	// options:  {
@@ -84,6 +85,7 @@ app.get('/callback', function(req, res){
 		return;
 	}
 
+	// redirect_url 로 전달된 state 값이 이전에 저장된 state 값과 동일하지 않을 시 에러 메세지
 	if (req.query.state != state) {
 		console.log('State DOES NOT MATCH: expected %s got %s', state, req.query.state);
 		res.render('error', {error: 'State value did not match'});
