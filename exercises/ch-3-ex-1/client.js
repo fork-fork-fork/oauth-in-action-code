@@ -43,6 +43,7 @@ app.get('/', function (req, res) {
 	res.render('index', {access_token: access_token, scope: scope});
 });
 
+// 인가 프로세스: 사용자를 인가 엔드포인트 주소로 이동시킴
 app.get('/authorize', function(req, res){
 
 	access_token = null;
@@ -65,11 +66,12 @@ app.get('/authorize', function(req, res){
 
 	// authServer.authorizationEndpoint: http://localhost:9001/authorize
 	var authorizeUrl = buildUrl(authServer.authorizationEndpoint, options);
+	// 인가 프로세스를 시작하기 위해, 적당한 질의 파라미터를 url에 포함시킴 -> 사용자를 서버의 인가 엔드포인트로 리다이렉트
 
 	console.log("redirect", authorizeUrl);
 	// redirect http://localhost:9001/authorize?response_type=code&client_id=oauth-client-1&redirect_uri=http%3A%2F%2Flocalhost%3A9000%2Fcallback&state=i324YlUuW7DAHmhbVD2cSQSxlIgf3iyj
 
-	res.redirect(authorizeUrl);
+	res.redirect(authorizeUrl); // 사용자의 웹 브라우저를 인가 엔드포인트로 리다이렉트 시킴
 });
 
 app.get('/callback', function(req, res){
@@ -148,8 +150,10 @@ app.get('/fetch_resource', function(req, res) {
 });
 
 var buildUrl = function(base, options, hash) {
-	var newUrl = url.parse(base, true);
+	var newUrl = url.parse(base, true);	// 자바스크립트의 url 라이브러리를 이용, 사용자를 리다이렉트할 목적지 url를 만듦
 	delete newUrl.search;
+	// 해당 url 에 전달할 질의 파라미터를 포맷에 맞게 만들고, url 인코딩 수행
+	// 그런 다음, 작업을 위한 유틸리티 함수, 프런트 채널 통신을 위해 url을 올바로 만들고 질의 파라미터를 추가해야 함
 	if (!newUrl.query) {
 		newUrl.query = {};
 	}
