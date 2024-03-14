@@ -138,8 +138,10 @@ app.get('/callback', function(req, res){
 // 실제 OAuth 애플리케이션에서는 액세스 토큰 값을 표시해주지 않음
 // 액세스 토큰은 클라이언트가 보호해야 하는 비밀 정보이기 때문
 
+// 보호된 리소스를 호출, 그 응답 데이터를 화면에 출력하는 코드가 필요
 app.get('/fetch_resource', function(req, res) {
 
+	// 액세스 토큰얼 갖고 있는지 체크
 	if (!access_token) {
 		res.render('error', {error: 'Missing Access Token'});
 		return;
@@ -147,16 +149,19 @@ app.get('/fetch_resource', function(req, res) {
 
 	console.log('Making request with access token %s', access_token);
 
+	// 보호된 리소스는 자신에게 전달된 요청을 인가된 요청으로 받아들임
+	// 그러므로, Authorization : Bearer 헤더에 다음과 같이 액세스 토큰을 담아 자신이 인가된 클라이언트라는 것을 나타냄
 	var headers = {
 		'Authorization': 'Bearer ' + access_token
 	};
 
-	var resource = request('POST', protectedResource,
+	// 먼저 어디에 요청을 보낼 것인지 알아야 하므로, protectedResource에 요청을 보낼 주소 설정
+	var resource = request('POST', protectedResource, // 해당 url에 post 요청을 보내 json 객체를 응답으로 받음
 		{headers: headers}
 	);
 
 	if (resource.statusCode >= 200 && resource.statusCode < 300) {
-		var body = JSON.parse(resource.getBody());
+		var body = JSON.parse(resource.getBody()); // 액세스 토큰을 얻어 보호된 리소스에 데이터를 요청, 그것을 화면에 보여줌
 		res.render('data', {resource: body});
 		return;
 	} else {
