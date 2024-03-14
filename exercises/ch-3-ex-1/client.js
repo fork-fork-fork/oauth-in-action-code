@@ -15,16 +15,20 @@ app.set('view engine', 'html');
 app.set('views', 'files/client');
 
 // authorization server information
+// 클라이언트는 자신이 대화하는 서버가 무엇이고, 어떻게 대화해야 하는지 알아야 함
+// 서버의 인가 엔드포인트, 토큰 엔드포인트의 주소도 필요
 var authServer = {
 	authorizationEndpoint: 'http://localhost:9001/authorize',
 	tokenEndpoint: 'http://localhost:9001/token'
 };
 
 // client information
-
+// 신뢰할 수 있는 OAuth 클라이언트
 var client = {
 	"client_id": "oauth-client-1",
-	"client_secret": "oauth-client-secret-1",
+	"client_secret": "oauth-client-secret-1", // 인가 서버가 할당
+	// 클라이언트가 인가 서버로부터 자기자신을 인증받기 위해 공유된 비밀번호를 가짐
+	// client_secret은 다양한 방법으로 인가 서버의 토큰 엔드포인트에 전달 가능: 여기서는 http basic 이용
 	"redirect_uris": ["http://localhost:9000/callback"]
 };
 
