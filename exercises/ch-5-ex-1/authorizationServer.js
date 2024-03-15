@@ -54,28 +54,37 @@ app.get('/', function(req, res) {
 
 app.get("/authorize", function(req, res){
 
+	// 인가를 요청한 클라이언트 확인
+	// 인가 서버는 해당 클라이언트가 등록된 것인지 확인
 	var client = getClient(req.query.client_id);
 
+	// 어느 클라이언트가 인가를 요청한 것인지 알게 됐으므로, 전달된 요청 자체에 대한 몇 가지 체크 수행
+	// client_id 는 공개된 정보이므로, 전달된 요청이 적법한지 확인 = redirect_uri
 	if (!client) {
 		console.log('Unknown client %s', req.query.client_id);
 		res.render('error', {error: 'Unknown client'});
 		return;
 	} else if (!__.contains(client.redirect_uris, req.query.redirect_uri)) {
+		// 등록된 클라이언트 정보의 redirect_uri 와 전달된 값이 같지 않다면 에러 발생
 		console.log('Mismatched redirect URI, expected %s got %s', client.redirect_uris, req.query.redirect_uri);
 		res.render('error', {error: 'Invalid redirect URI'});
 		return;
 	} else {
 
+		// 인가 서버는 전달되는 요청의 파라미터를 사용자가 승인한 이후 다시 참조할 수 있도록 request 변수에 저장(임의 값)
 		var reqid = randomstring.generate(8);
-
 		requests[reqid] = req.query;
 
-		res.render('approve', {client: client, reqid: reqid });
+		// 인가 서버는 approve.html 페이지로 클라이언트 정보와 앞서 요청 정보를 저장하는 데 사용한 임의의 키 값을 함께 전달
+		res.render('approve', {client: client, reqid: reqid }); // 임의의 키 값 reqid는 폼의 숨긴 속성의 값으로 전달됨
+		// 사용자가 클라이언트에게 권한을 위임할 것인지 여부를 판단할 수 있도록, 사용자에게 클라이언트에 대한 정보를 출력
+		// 이 때 사용되는 임의의 키 값: 다음 단계 추가 처리를 위해 원래 전달된 요청 데이터를 찾는 데 사용됨 -> 간단한 CSRF 공격 차단 효과 제공
 		return;
 	}
 
 });
 
+// http 요청은 http 폼 인코딩된 형태의 값으로 전달됨
 app.post('/approve', function(req, res) {
 
 	var reqid = req.body.reqid;
@@ -84,13 +93,19 @@ app.post('/approve', function(req, res) {
 
 	if (!query) {
 		// there was no matching saved request, this is an error
+		// 지연된 인가 요청을 찾지 못한다면, 교차 사이트 위조 공격일 수 있으므로 -> 사용자에게 에러 페이지 보여 줌
 		res.render('error', {error: 'No matching authorization request'});
 		return;
 	}
 
-	if (req.body.approve) {
-		if (query.response_type == 'code') {
+	if (req.body.approve) { // 사용자가 접근 권한을 인가했을 때
+		if (query.response_type == 'code') { // 클라이언트가 어떤 종류의 응답을 요청한 것인지 확인(인가 코드 그랜트 타입 구현 처리에 대해, response_type = code 인지 확인)
 			// user approved access
+
+			// 어떤 종류의 응답을 해야 하는지 알게 됐으므로, 클라이언트에게 전달한 인가 코드를 생성
+			// 생성한 코드는 서버 어딘가 저장해 놓음 -> 이후 클라이언트가 토큰 엔드포인트를 호출했을 때, 해당 클라이언트에게 전달할 인가 코드를 찾아볼 수 있기 때문
+			// 여기서는 서버상의 객체에 저장하지만, 실제 서비스에서는 주로 데이터베이스에 저장됨
+			// 어떤 경우든 인가 코드로 접근이 가능해야 함
 			var code = randomstring.generate(8);
 
 			// save the code and request for later
@@ -100,9 +115,11 @@ app.post('/approve', function(req, res) {
 				code: code,
 				state: query.state
 			});
+			console.log('urlParsed: ', urlParsed);
+
 			res.redirect(urlParsed);
 			return;
-		} else {
+		} else { // code 이외의 값이면 클라이언트에게 에러 반환
 			// we got a response type we don't understand
 			var urlParsed = buildUrl(query.redirect_uri, {
 				error: 'unsupported_response_type'
@@ -110,8 +127,15 @@ app.post('/approve', function(req, res) {
 			res.redirect(urlParsed);
 			return;
 		}
-	} else {
+	} else { // 사용자가 접근 권한을 거부했을 때
 		// user denied access
+		// 사용자가 접근 거부한 내용을 클라이언트에게 안전하게 전달해야 함
+		// -> 프런트 채널 통신이므로 클라이언트에게 메시지를 직접 전달할 방법을 갖고 있지 않음
+		// => 클라이언트가 요청을 전달하기 위해 사용한 방법과 동일한 방법 사용
+		// 즉, 클라이언트의 리다이렉트 uri에 몇 가지 특별한 질의 파라미터를 추가, 사용자의 웹 브라우저를 그곳으로 리다이렉트 시킴
+		// 클라이언트 리다이렉트 uri는 이런 목적으로 사용됨
+		// 이 때문에, 클라이언트가 인가 서버에 요청을 보냈을 때 등록된 클라이언트 정보를 기준으로 클라이언트의 리다이렉트 uri를 검사한 것
+		// => 클라이언트에 사용자가 접근 요청을 거부했다는 에러 메세지 전달
 		var urlParsed = buildUrl(query.redirect_uri, {
 			error: 'access_denied'
 		});

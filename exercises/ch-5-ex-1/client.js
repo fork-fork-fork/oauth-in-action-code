@@ -48,13 +48,14 @@ app.get('/', function (req, res) {
 	res.render('index', {access_token: access_token, refresh_token: refresh_token, scope: scope});
 });
 
+// 인가 엔드포인트 역할
 app.get('/authorize', function(req, res){
 
 	access_token = null;
 	refresh_token = null;
 	scope = null;
 	state = randomstring.generate();
-	
+
 	var authorizeUrl = url.parse(authServer.authorizationEndpoint, true);
 	delete authorizeUrl.search; // this is to get around odd behavior in the node URL library
 	authorizeUrl.query.response_type = 'code';
@@ -62,19 +63,19 @@ app.get('/authorize', function(req, res){
 	authorizeUrl.query.client_id = client.client_id;
 	authorizeUrl.query.redirect_uri = client.redirect_uris[0];
 	authorizeUrl.query.state = state;
-	
+
 	console.log("redirect", url.format(authorizeUrl));
 	res.redirect(url.format(authorizeUrl));
 });
 
 app.get("/callback", function(req, res){
-	
+
 	if (req.query.error) {
 		// it's an error response, act accordingly
 		res.render('error', {error: req.query.error});
 		return;
 	}
-	
+
 	var resState = req.query.state;
 	if (resState == state) {
 		console.log('State value matches: expected %s got %s', state, resState);
@@ -96,25 +97,25 @@ app.get("/callback", function(req, res){
 		'Authorization': 'Basic ' + Buffer.from(querystring.escape(client.client_id) + ':' + querystring.escape(client.client_secret)).toString('base64')
 	};
 
-	var tokRes = request('POST', authServer.tokenEndpoint, 
-		{	
+	var tokRes = request('POST', authServer.tokenEndpoint,
+		{
 			body: form_data,
 			headers: headers
 		}
 	);
 
 	console.log('Requesting access token for code %s',code);
-	
+
 	if (tokRes.statusCode >= 200 && tokRes.statusCode < 300) {
 		var body = JSON.parse(tokRes.getBody());
-	
+
 		access_token = body.access_token;
 		console.log('Got access token: %s', access_token);
 		if (body.refresh_token) {
 			refresh_token = body.refresh_token;
 			console.log('Got refresh token: %s', refresh_token);
 		}
-		
+
 		scope = body.scope;
 		console.log('Got scope: %s', scope);
 
@@ -136,8 +137,8 @@ var refreshAccessToken = function(req, res) {
 		'Content-Type': 'application/x-www-form-urlencoded'
 	};
 	console.log('Refreshing token %s', refresh_token);
-	var tokRes = request('POST', authServer.tokenEndpoint, 
-		{	
+	var tokRes = request('POST', authServer.tokenEndpoint,
+		{
 			body: form_data,
 			headers: headers
 		}
@@ -153,7 +154,7 @@ var refreshAccessToken = function(req, res) {
 		}
 		scope = body.scope;
 		console.log('Got scope: %s', scope);
-	
+
 		// try again
 		res.render('index', {access_token: access_token, refresh_token: refresh_token, scope: scope});
 		return;
@@ -170,18 +171,18 @@ app.get('/fetch_resource', function(req, res) {
 		res.render('error', {error: 'Missing access token.'});
 		return;
 	}
-	
+
 	console.log('Making request with access token %s', access_token);
-	
+
 	var headers = {
 		'Authorization': 'Bearer ' + access_token,
 		'Content-Type': 'application/x-www-form-urlencoded'
 	};
-	
+
 	var resource = request('POST', protectedResource,
 		{headers: headers}
 	);
-	
+
 	if (resource.statusCode >= 200 && resource.statusCode < 300) {
 		var body = JSON.parse(resource.getBody());
 		res.render('data', {resource: body});
@@ -191,7 +192,7 @@ app.get('/fetch_resource', function(req, res) {
 		res.render('error', {error: 'Server returned response code: ' + resource.statusCode});
 		return;
 	}
-	
+
 });
 
 app.use('/', express.static('files/client'));
@@ -201,4 +202,4 @@ var server = app.listen(9000, 'localhost', function () {
   var port = server.address().port;
   console.log('OAuth Client is listening at http://%s:%s', host, port);
 });
- 
+
