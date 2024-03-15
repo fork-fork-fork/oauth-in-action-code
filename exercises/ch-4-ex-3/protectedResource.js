@@ -32,20 +32,20 @@ var getAccessToken = function(req, res, next) {
 	} else if (req.query && req.query.access_token) {
 		inToken = req.query.access_token
 	}
-	
+
 	console.log('Incoming token: %s', inToken);
 	nosql.one().make(function(builder) {
-	  builder.where('access_token', inToken);
-	  builder.callback(function(err, token) {
-	    if (token) {
-	      console.log("We found a matching token: %s", inToken);
-	    } else {
-	      console.log('No matching token was found.');
-	    };
-	    req.access_token = token;
-	    next();
-	    return;
-	  });
+		builder.where('access_token', inToken);
+		builder.callback(function(err, token) {
+			if (token) {
+				console.log("We found a matching token: %s", inToken);
+			} else {
+				console.log('No matching token was found.');
+			};
+			req.access_token = token;
+			next();
+			return;
+		});
 	});
 };
 
@@ -57,22 +57,26 @@ var requireAccessToken = function(req, res, next) {
 	}
 };
 
+// 각각 권한별 핸들러가 아닌, 하나의 핸들러에서 모든 권한 처리
 app.get('/produce', getAccessToken, requireAccessToken, function(req, res) {
-	var produce = {fruit: ['apple', 'banana', 'kiwi'], 
-		veggies: ['lettuce', 'onion', 'potato'], 
-		meats: ['bacon', 'steak', 'chicken breast']};	
-
-	/*
-	 * Add different kinds of produce based on the incoming token's scope
-	 */
-
+	var produce = {fruit: [], veggies: [], meats: []};
+	if (__.contains(req.access_token.scope, 'fruit')) {
+		produce.fruit = ['apple', 'banana', 'kiwi'];
+	}
+	if (__.contains(req.access_token.scope, 'veggies')) {
+		produce.veggies = ['lettuce', 'onion', 'potato'];
+	}
+	if (__.contains(req.access_token.scope, 'meats')) {
+		produce.meats = ['bacon', 'steak', 'chicken breast'];
+	}
+	console.log('Sending produce: ', produce);
 	res.json(produce);
 });
 
 var server = app.listen(9002, 'localhost', function () {
-  var host = server.address().address;
-  var port = server.address().port;
+	var host = server.address().address;
+	var port = server.address().port;
 
-  console.log('OAuth Resource Server is listening at http://%s:%s', host, port);
+	console.log('OAuth Resource Server is listening at http://%s:%s', host, port);
 });
- 
+
