@@ -145,17 +145,23 @@ app.post('/approve', function(req, res) {
 
 });
 
+// 토큰 엔드포인트 /token 에 대한 psot 요청을 처리하는 핸들러
 app.post("/token", function(req, res){
 
+	// 인가 서버는 OAuth 스펙에서 권장는 방법으로 클라이언트가 자격 증명 정보를 전달했는지 확인하기 위해 http의 Authorization 헤더 확인
+	// -> 그 다음 폼 파라미터 확인
 	var auth = req.headers['authorization'];
 	if (auth) {
 		// check the auth header
+		// 헤더를 읽어 각 변수에 저장
 		var clientCredentials = decodeClientCredentials(auth);
 		var clientId = clientCredentials.id;
 		var clientSecret = clientCredentials.secret;
 	}
 
 	// otherwise, check the post body
+	// 클라이언트가 전달한 클라이언트 id와 클라이언트 시크릿 값이 폼 파라미터로 전달됐는지 확인
+	// Authorization 헤더 전달 외 2번째 방법으로 자격 증명 정보가 전달됐는지 확인
 	if (req.body.client_id) {
 		if (clientId) {
 			// if we've already seen the client's credentials in the authorization header, this is an error
@@ -164,10 +170,12 @@ app.post("/token", function(req, res){
 			return;
 		}
 
+		// 에러가 없을 시 입력된 폼 데이터에서 전달된 값 저장
 		var clientId = req.body.client_id;
 		var clientSecret = req.body.client_secret;
 	}
 
+	// 헬퍼 함수 이용, 클라이언트가 등록된 클라이언트 리스트에 있는지 확인
 	var client = getClient(clientId);
 	if (!client) {
 		console.log('Unknown client %s', clientId);
@@ -175,26 +183,40 @@ app.post("/token", function(req, res){
 		return;
 	}
 
+	// 클라이언트의 클라이언트 시크릿 값이 올바른지 확인
 	if (client.client_secret != clientSecret) {
 		console.log('Mismatched client secret, expected %s got %s', client.client_secret, clientSecret);
 		res.status(401).json({error: 'invalid_client'});
 		return;
 	}
 
-	if (req.body.grant_type == 'authorization_code') {
+	// grant_type 파라미터의 값 확인 -> 처리 가능한 그랜트 타입인지 확인
+	// 여기서는 인가 코드 그랜트 타입만 지원하며, grant_type = authorization_code
+	if (req.body.grant_type == 'authorization_code') { // 인가 코드 그랜트 처리
 
-		var code = codes[req.body.code];
+		var code = codes[req.body.code]; // 인가 코드 추출, 저장된 인가 코드 저장소에 해당 코드가 있는지 확인
 
+		// 전달된 인가 코드를 코드 저장소에서 찾을 수 있다면, 클라이언트에게 발급된 것이라 판단
+		// 인가 코드, 클라이언트 id, 인가 엔드포인트에 전달된 요청 내용이 함께 저장된 것을 확인할 수 있음
 		if (code) {
 			delete codes[req.body.code]; // burn our code, it's been used
-			if (code.request.client_id == clientId) {
+			// 전달된 인가 코드가 유효하다는 것이 확인되면 무조건 서버 저장소에서 제거
+			// 악의적인 클라이언트가 탈취된 인가 코드를 사용할 수 있기 때문, 한 번 사용된 인가 코드는 재사용 불가능
 
+			if (code.request.client_id == clientId) { // 클라이언트 id 가 동일한지 비교
+
+				// 클라이언트 id가 확인되면 액세스 토큰을 만들고 나중에 찾아볼 수 있도록 그것을 저장
 				var access_token = randomstring.generate();
 				nosql.insert({ access_token: access_token, client_id: clientId });
+				// 엑세스 토큰을 nosql 데이터베이스 저장
+				// 실제 OAuth 시스템에서는 액세스 토큰을 다양한 방법으로 저장하고 관리함
 
 				console.log('Issuing access token %s', access_token);
 
-				var token_response = { access_token: access_token, token_type: 'Bearer' };
+				// 생성되고 저장된 토큰을 클라이언트에게 전달
+				// 토큰 엔드포인트에서 클라이언트에게 전달하는 응답은 json 객체로, 액세스 토큰과 토큰 타입이 포함됨
+				// 여기서는 Bearer 토큰 사용
+				var token_response = { access_token: access_token, token_type: 'Bearer' }; // token_type: 클라이언트가 자신에게 전달된 토큰이 어떤 종류고, 보호된 리소스에 접근하기 위해 어떻게 사용해야 하는지 알 수 있도록 하는 정보
 
 				res.status(200).json(token_response);
 				console.log('Issued tokens for code %s', req.body.code);
@@ -210,7 +232,7 @@ app.post("/token", function(req, res){
 			res.status(400).json({error: 'invalid_grant'});
 			return;
 		}
-	} else {
+	} else { // 지원하지 않는 그랜트 타입일 시 에러 반환
 		console.log('Unknown grant type %s', req.body.grant_type);
 		res.status(400).json({error: 'unsupported_grant_type'});
 	}
