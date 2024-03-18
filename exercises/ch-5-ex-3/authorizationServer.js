@@ -152,6 +152,7 @@ app.post('/approve', function(req, res) {
 
 });
 
+// 토큰 엔드포인트 처리
 app.post("/token", function(req, res){
 
 	var auth = req.headers['authorization'];
@@ -199,11 +200,15 @@ app.post("/token", function(req, res){
 				var access_token = randomstring.generate();
 				var refresh_token = randomstring.generate();
 
+				// 저장해 놓은 권한 범위가 필요
+				// 권한 범위는 인가 코드 객체에 저장됐으므로, 꺼내기만 하면 됨
 				nosql.insert({ access_token: access_token, client_id: clientId, scope: code.scope });
 				nosql.insert({ refresh_token: refresh_token, client_id: clientId, scope: code.scope });
 
 				console.log('Issuing access token %s', access_token);
 
+				// 엔드포인트는 클라이언트에게 발급되는 토큰의 권한 범위 정보를 응답 데이터에 포함해 전달
+				// 권한 범위 정보는 배열 -> 문자열로 변환해 응답으로 전달되는 json 객체에 추가
 				var token_response = { access_token: access_token, token_type: 'Bearer',  refresh_token: refresh_token, scope: code.scope.join(' ') };
 
 				res.status(200).json(token_response);
