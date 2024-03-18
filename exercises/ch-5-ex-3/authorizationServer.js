@@ -88,6 +88,10 @@ app.get("/authorize", function(req, res){
 
 });
 
+// 승인 페이지에 대한 처리를 수행
+// 폼 템플릿은 모든 체크 박스에 scope_ 접두사로 시작하는 고유한 레이블 지정
+// => 사용자가 선택한 권한이 무엇인지 알 수 있음
+// => 서버는 자신에게 전달된 폼 데이터를 통해 리소스 소유자가 어떤 권한 범위를 승인했는지 알 수 있음
 app.post('/approve', function(req, res) {
 
 	var reqid = req.body.reqid;
@@ -104,7 +108,9 @@ app.post('/approve', function(req, res) {
 		if (query.response_type == 'code') {
 			// user approved access
 
-			var rscope = getScopesFromForm(req.body);
+			var rscope = getScopesFromForm(req.body); // 사용자가 승인한 권한 정보에 대한 처리
+
+			// 서버로 전달되는 post 데이터는 변조 가능하므로, 클라이언트에게 실제로 인가된 권한의 범위를 벗어나는지 서버에서 다시 확인
 			var client = getClient(query.client_id);
 			var cscope = client.scope ? client.scope.split(' ') : undefined;
 			if (__.difference(rscope, cscope).length > 0) {
@@ -118,7 +124,7 @@ app.post('/approve', function(req, res) {
 			var code = randomstring.generate(8);
 
 			// save the code and request for later
-
+			// 사용자가 인가한 권한 범위를 서버가 생성한 인가 코드와 함께 저장 => 이후 토큰 엔드포인트에서 다시 한 번 꺼내 확인 가능
 			codes[code] = { request: query, scope: rscope };
 
 			var urlParsed = buildUrl(query.redirect_uri, {
