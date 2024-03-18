@@ -36,12 +36,13 @@ var rsaKey = {
 };
 
 // client information
-
+// 클라이언트 정보 구조체에 scope라는 새로운 정보 추가
 var client = {
 	"client_id": "oauth-client-1",
 	"client_secret": "oauth-client-secret-1",
 	"redirect_uris": ["http://localhost:9000/callback"],
-	"scope": "foo bar"
+	"scope": "foo bar" // 공백을 기준으로 하나의 OAuth 권한 범위값을 나타냄
+	// 이런 식으로 등록한느 것만으로는 OAuth 클라이언트가 보호된 리소스에 접근할 수 없으며, 여전히 리소스 소유자에게 인가받아야 함
 };
 
 //var client = {};
